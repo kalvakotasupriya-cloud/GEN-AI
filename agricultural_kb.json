@@ -1,0 +1,14 @@
+[
+  {
+    "question": "How to treat yellowing of leaves in rice?",
+    "answer": "Yellowing in rice (chlorosis) can have multiple causes:\n1. Nitrogen deficiency: Apply Urea @ 20-25 kg/acre as top-dress\n2. Iron deficiency: Spray FeSO4 @ 5g/liter with citric acid\n3. Zinc deficiency: Apply ZnSO4 @ 10 kg/acre or spray 5g/liter\n4. Blast disease: Use Tricyclazole 75 WP @ 0.6g/liter\n5. BLB (Bacterial Leaf Blight): Drain field, spray Copper Oxychloride\n\nDiagnosis tip: If younger leaves are yellow - nutrient deficiency. If older leaves - nitrogen deficiency.",
+    "category": "disease",
+    "timestamp": "2024-01-01 00:00:00"
+  },
+  {
+    "question": "Best time to sow wheat in north India",
+    "answer": "Wheat Sowing Calendar (North India - Punjab, Haryana, UP):\n\nOptimal Time: 1-25 November (for timely sowing)\nVarieties: HD 3086, HD 2967, GW 496, DBW 222\n\nLate Sowing (after 25 Nov): Use late sowing varieties\nVarieties: HD 2781, K 307, NW 1014\n\nSeed Rate: 40-45 kg/acre (timely sowing)\nSeed Rate: 50-55 kg/acre (late sowing)\n\nSeed Treatment: Carbendazim + Thiram (2.5g+1.5g per kg seed)\n\nNote: Each week of delay after 15 Nov reduces yield by ~40-50 kg/acre",
+    "category": "crop_management",
+    "timestamp": "2024-01-01 00:00:00"
+  }
+]

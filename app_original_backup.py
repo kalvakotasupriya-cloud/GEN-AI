@@ -172,24 +172,19 @@ if active == "home":
 
 # ─────────────────────────── CHATBOT PAGE ────────────────────────────────────
 elif active == "chatbot":
-    import hashlib
-    from utils.voice import transcribe, speak
+    from utils.voice import transcribe_audio, text_to_speech_bytes
 
-    # Voice session state
-    for _k, _v in [("last_audio_hash", ""), ("tts_bytes", None)]:
-        if _k not in st.session_state:
-            st.session_state[_k] = _v
+    # ── session defaults for voice ────────────────────────────────────────────
+    if "voice_transcript" not in st.session_state:
+        st.session_state.voice_transcript = ""
+    if "last_audio_hash" not in st.session_state:
+        st.session_state.last_audio_hash = None
+    if "tts_audio_bytes" not in st.session_state:
+        st.session_state.tts_audio_bytes = None
 
     st.markdown(f'<h2 class="section-title">🤖 {t("ai_chatbot")}</h2>', unsafe_allow_html=True)
 
-    # ── Play TTS audio if available (autoplay) ────────────────────────────────
-    if st.session_state.tts_bytes:
-        st.audio(st.session_state.tts_bytes, format="audio/mp3", autoplay=True)
-        if st.button("🔇 Clear voice", key="clr_voice"):
-            st.session_state.tts_bytes = None
-            st.rerun()
-
-    # ── Chat history ──────────────────────────────────────────────────────────
+    # ── Chat display ──────────────────────────────────────────────────────────
     chat_container = st.container()
     with chat_container:
         if not st.session_state.chat_history:
@@ -207,42 +202,53 @@ elif active == "chatbot":
             else:
                 st.markdown(f'<div class="chat-msg bot-msg">🤖 {msg["content"]}</div>', unsafe_allow_html=True)
 
-    # ── Voice input section ───────────────────────────────────────────────────
-    st.markdown("---")
-    st.markdown("### 🎙️ Voice Input")
-    st.caption(f"Click the 🎙️ button, speak in **{lang}**, click again to stop. Answer will be read aloud automatically.")
+    # ── TTS playback — shown right after chat history ─────────────────────────
+    # Placed here so it appears immediately after the answer and auto-plays
+    if st.session_state.tts_audio_bytes:
+        st.info("🔊 Playing voice answer...")
+        st.audio(st.session_state.tts_audio_bytes, format="audio/mp3", autoplay=True)
+        if st.button("🔇 Stop / Clear Voice", key="clear_tts"):
+            st.session_state.tts_audio_bytes = None
+            st.rerun()
 
+    st.markdown("---")
+
+    # ══════════════════════════════════════════════════════════════════════════
+    #  🎙️  VOICE INPUT  — record mic → transcribe → show text → get AI answer
+    # ══════════════════════════════════════════════════════════════════════════
     try:
         from audio_recorder_streamlit import audio_recorder
 
+        st.markdown("**🎙️ Voice Input** — click the mic icon below, speak your question, then click again to stop:")
+
         audio_bytes = audio_recorder(
-            text="",
+            text="",                  # no label; icon only
             recording_color="#e74c3c",
-            neutral_color="#1b4332",
+            neutral_color="#2d6a4f",
             icon_name="microphone",
-            icon_size="3x",
-            pause_threshold=3.0,
+            icon_size="2x",
+            pause_threshold=2.5,      # auto-stops after 2.5s silence
             sample_rate=16000,
+            key="voice_recorder",
         )
 
         if audio_bytes:
+            # Use a hash so we only process each new recording once
+            import hashlib
             audio_hash = hashlib.md5(audio_bytes).hexdigest()
 
             if audio_hash != st.session_state.last_audio_hash:
                 st.session_state.last_audio_hash = audio_hash
-                st.session_state.tts_bytes = None
 
-                # ── STT ───────────────────────────────────────────────────────
                 with st.spinner("🎧 Transcribing your voice..."):
-                    transcript, stt_err = transcribe(audio_bytes, lang)
+                    transcript, err = transcribe_audio(audio_bytes, lang)
 
-                if stt_err:
-                    st.error(f"⚠️ {stt_err}")
-                elif not transcript:
-                    st.warning("No speech detected. Please try again.")
-                else:
+                if err:
+                    st.error(err)
+                elif transcript:
                     # Show what was heard
-                    st.success(f"🎙️ You said: **{transcript}**")
+                    st.success(f"🎙️ **You said:** {transcript}")
+                    st.session_state.voice_transcript = transcript
 
                     # ── Get AI answer ─────────────────────────────────────────
                     with st.spinner(t("thinking")):
@@ -252,45 +258,55 @@ elif active == "chatbot":
                         else:
                             ans = f"[{t('offline_mode')}]\n\n{offline_ans}"
 
+                    # Add to chat history
                     st.session_state.chat_history.append({"role": "user",      "content": transcript})
                     st.session_state.chat_history.append({"role": "assistant", "content": ans})
                     log_query(st.session_state.farmer_name, st.session_state.farmer_location, transcript, "chatbot")
 
-                    # ── TTS ───────────────────────────────────────────────────
+                    # ── Generate TTS audio ────────────────────────────────────
                     with st.spinner("🔊 Generating voice answer..."):
-                        mp3, tts_err = speak(ans, lang)
-                    if tts_err:
-                        st.warning(f"TTS: {tts_err}")
-                    else:
-                        st.session_state.tts_bytes = mp3
+                        mp3_bytes, tts_err = text_to_speech_bytes(ans, lang)
 
-                    st.rerun()
+                    if tts_err:
+                        st.warning(tts_err)
+                    else:
+                        st.session_state.tts_audio_bytes = mp3_bytes
+
+                    st.rerun()   # re-render chat + trigger audio playback
+                else:
+                    st.warning("⚠️ No speech detected. Please speak clearly and try again.")
 
     except ImportError:
-        st.warning("🔧 Voice input not installed. Run: `pip install audio-recorder-streamlit`")
+        st.warning("⚠️ Voice input unavailable. Install it with: `pip install audio-recorder-streamlit`")
 
     st.markdown("---")
 
     # ── Sample queries ────────────────────────────────────────────────────────
     st.markdown(f'<div class="sample-queries-title">{t("sample_queries")}:</div>', unsafe_allow_html=True)
-    sample_qs = [t("sample_q1"), t("sample_q2"), t("sample_q3"), t("sample_q4")]
+    sample_qs = [
+        t("sample_q1"), t("sample_q2"), t("sample_q3"), t("sample_q4")
+    ]
     sq_cols = st.columns(4)
     for i, sq in enumerate(sample_qs):
         with sq_cols[i]:
             if st.button(sq, key=f"sq_{i}", use_container_width=True):
-                st.session_state.tts_bytes = None
+                st.session_state.tts_audio_bytes = None
                 st.session_state.chat_history.append({"role": "user", "content": sq})
                 with st.spinner(t("thinking")):
                     offline_ans = search_offline(sq)
-                    ans = get_groq_response(sq, lang, context=offline_ans) if st.session_state.online_mode else f"[{t('offline_mode')}]\n\n{offline_ans}"
+                    if st.session_state.online_mode:
+                        ans = get_groq_response(sq, lang, context=offline_ans)
+                    else:
+                        ans = f"[{t('offline_mode')}]\n\n{offline_ans}"
                 st.session_state.chat_history.append({"role": "assistant", "content": ans})
                 log_query(st.session_state.farmer_name, st.session_state.farmer_location, sq, "chatbot")
-                mp3, _ = speak(ans, lang)
-                if mp3:
-                    st.session_state.tts_bytes = mp3
+                # Generate TTS for sample query answer too
+                mp3_bytes, _ = text_to_speech_bytes(ans, lang)
+                if mp3_bytes:
+                    st.session_state.tts_audio_bytes = mp3_bytes
                 st.rerun()
 
-    # ── Text input ────────────────────────────────────────────────────────────
+    # ── Text input (unchanged) ────────────────────────────────────────────────
     col_input, col_send = st.columns([5, 1])
     with col_input:
         user_input = st.text_input("", placeholder=t("type_query"), key="chat_input", label_visibility="collapsed")
@@ -298,17 +314,21 @@ elif active == "chatbot":
         send = st.button(f"📤 {t('send')}", use_container_width=True)
 
     if send and user_input:
-        st.session_state.tts_bytes = None
+        st.session_state.tts_audio_bytes = None
         st.session_state.chat_history.append({"role": "user", "content": user_input})
         with st.spinner(t("thinking")):
             offline_ans = search_offline(user_input)
-            ans = get_groq_response(user_input, lang, context=offline_ans) if st.session_state.online_mode else f"[{t('offline_mode')}]\n\n{offline_ans}"
+            if st.session_state.online_mode:
+                ans = get_groq_response(user_input, lang, context=offline_ans)
+            else:
+                ans = f"[{t('offline_mode')}]\n\n{offline_ans}"
         st.session_state.chat_history.append({"role": "assistant", "content": ans})
         log_query(st.session_state.farmer_name, st.session_state.farmer_location, user_input, "chatbot")
+        # TTS for typed queries too
         with st.spinner("🔊 Generating voice answer..."):
-            mp3, _ = speak(ans, lang)
-        if mp3:
-            st.session_state.tts_bytes = mp3
+            mp3_bytes, _ = text_to_speech_bytes(ans, lang)
+        if mp3_bytes:
+            st.session_state.tts_audio_bytes = mp3_bytes
         st.rerun()
 
 # ─────────────────────────── DISEASE PAGE ────────────────────────────────────

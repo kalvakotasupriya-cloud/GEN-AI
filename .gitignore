@@ -1,0 +1,44 @@
+# Kisan Sahayak .gitignore
+
+# Environment & Secrets
+.env
+*.env.local
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyc
+.Python
+venv/
+env/
+.venv/
+*.egg-info/
+dist/
+build/
+
+# Data (exclude logs but keep structure)
+data/query_logs.json
+knowledge_base/agricultural_kb.json
+
+# Model files (large)
+*.pkl
+*.faiss
+*.index
+models/*.bin
+
+# OS
+.DS_Store
+Thumbs.db
+*.swp
+
+# IDE
+.vscode/
+.idea/
+*.iml
+
+# Streamlit
+.streamlit/secrets.toml
+
+# Uploads
+uploads/
+temp/
